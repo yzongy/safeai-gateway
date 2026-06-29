@@ -345,8 +345,11 @@ def _remove_safeai_config(text: str) -> str:
 
 
 def _remove_marked_block(text: str, begin: str, end: str) -> str:
-    pattern = re.compile(rf"(?ms)^\\s*{re.escape(begin)}.*?{re.escape(end)}\\s*\\n?")
-    return pattern.sub("", text)
+    block_pattern = re.compile(rf"(?ms)^\s*{re.escape(begin)}.*?{re.escape(end)}\s*\n?")
+    text = block_pattern.sub("", text)
+    begin_pattern = re.compile(rf"(?m)^\s*{re.escape(begin)}\s*\n?")
+    end_pattern = re.compile(rf"(?m)^\s*{re.escape(end)}\s*\n?")
+    return end_pattern.sub("", begin_pattern.sub("", text))
 
 
 def _resolve_root(root: Optional[str]) -> Path:

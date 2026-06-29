@@ -38,8 +38,13 @@ def test_codex_install_status_and_uninstall_are_idempotent(tmp_path):
 
     text = config.read_text(encoding="utf-8")
     assert text.count("[mcp_servers.safeai]") == 1
+    assert text.count("BEGIN SAFEAI CODEX GATEWAY") == 1
+    assert text.count("END SAFEAI CODEX GATEWAY") == 1
     assert "CONFIG_VALUE_SHOULD_NOT_PRINT" in text
-    assert "safeai-codex-gateway" in agents.read_text(encoding="utf-8")
+    agents_text = agents.read_text(encoding="utf-8")
+    assert "safeai-codex-gateway" in agents_text
+    assert agents_text.count("BEGIN SAFEAI CODEX GATEWAY") == 1
+    assert agents_text.count("END SAFEAI CODEX GATEWAY") == 1
     assert (codex_dir / "skills" / "safeai-codex-gateway" / "SKILL.md").exists()
     assert (codex_dir / "skills" / "safeai-codex-gateway" / "agents" / "openai.yaml").exists()
 
