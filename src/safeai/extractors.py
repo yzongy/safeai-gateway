@@ -3,7 +3,9 @@ from __future__ import annotations
 import csv
 import hashlib
 import json
+import subprocess
 import shutil
+import tempfile
 import zipfile
 from pathlib import Path
 from typing import Iterable, List
@@ -15,7 +17,8 @@ from .models import ExtractedDocument
 TEXT_EXTENSIONS = {".txt", ".md", ".markdown", ".rst", ".log"}
 CSV_EXTENSIONS = {".csv", ".tsv"}
 JSON_EXTENSIONS = {".json", ".jsonl"}
-UNSUPPORTED_EXTENSIONS = {".doc", ".pages", ".zip", ".rar", ".7z", ".gz", ".tar"}
+LEGACY_DOC_EXTENSIONS = {".doc"}
+UNSUPPORTED_EXTENSIONS = {".pages", ".zip", ".rar", ".7z", ".gz", ".tar"}
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".tif", ".tiff", ".webp"}
 
 
@@ -65,6 +68,8 @@ def extract_document(path: Path, root: Path) -> ExtractedDocument:
             return _ok(path, source_id, _read_xlsx(path), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", sha)
         if suffix == ".pptx":
             return _ok(path, source_id, _read_pptx(path), "application/vnd.openxmlformats-officedocument.presentationml.presentation", sha)
+        if suffix in LEGACY_DOC_EXTENSIONS:
+            return _read_legacy_doc(path, source_id, sha)
         if suffix == ".pdf":
             return _read_pdf(path, source_id, sha)
         if suffix in IMAGE_EXTENSIONS:
@@ -145,6 +150,71 @@ def _read_pptx(path: Path) -> str:
             if text:
                 lines.append(f"[{Path(name).stem}]\n{text}")
     return "\n\n".join(lines)
+
+
+def _read_legacy_doc(path: Path, source_id: str, sha: str) -> ExtractedDocument:
+    attempted_converter = False
+    for command_name, args in (
+        ("textutil", ["-convert", "txt", "-stdout", str(path)]),
+        ("antiword", [str(path)]),
+        ("catdoc", [str(path)]),
+    ):
+        command = shutil.which(command_name)
+        if not command:
+            continue
+        attempted_converter = True
+        text = _run_stdout_converter([command, *args])
+        if text.strip():
+            return _ok(path, source_id, text, "application/msword", sha)
+
+    soffice = shutil.which("soffice")
+    if soffice:
+        attempted_converter = True
+        text = _read_legacy_doc_with_soffice(Path(soffice), path)
+        if text.strip():
+            return _ok(path, source_id, text, "application/msword", sha)
+
+    if attempted_converter:
+        return _error(path, source_id, "doc_extract_failed", "Legacy .doc conversion failed without exposing source content.", sha)
+
+    return _error(
+        path,
+        source_id,
+        "doc_dependency_missing",
+        "Install macOS textutil, LibreOffice, antiword, or catdoc to extract legacy .doc files locally.",
+        sha,
+    )
+
+
+def _run_stdout_converter(command: List[str]) -> str:
+    try:
+        proc = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=60, check=False)
+    except Exception:
+        return ""
+    if proc.returncode != 0:
+        return ""
+    return proc.stdout.decode("utf-8", errors="replace")
+
+
+def _read_legacy_doc_with_soffice(soffice: Path, path: Path) -> str:
+    with tempfile.TemporaryDirectory(prefix="safeai-doc-") as tmp:
+        tmp_path = Path(tmp)
+        try:
+            proc = subprocess.run(
+                [str(soffice), "--headless", "--convert-to", "txt:Text", "--outdir", str(tmp_path), str(path)],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                timeout=120,
+                check=False,
+            )
+        except Exception:
+            return ""
+        if proc.returncode != 0:
+            return ""
+        output = tmp_path / f"{path.stem}.txt"
+        if not output.exists():
+            return ""
+        return _read_text(output)
 
 
 def _read_pdf(path: Path, source_id: str, sha: str) -> ExtractedDocument:

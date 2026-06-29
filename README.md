@@ -132,10 +132,22 @@ Core support:
 
 - `.txt`, `.md`, `.csv`, `.json`
 - `.docx`, `.xlsx`, `.pptx` through local XML or installed Office libraries
+- legacy `.doc` through local converters: macOS `textutil`, LibreOffice `soffice`, `antiword`, or `catdoc`
 - `.pdf` if PyMuPDF is installed
 - common images if Tesseract, Pillow, and pytesseract are installed
 
-Unsupported files such as `.doc`, `.pages`, and archives are reported as blocked or skipped. Convert them first.
+Unsupported files such as `.pages` and archives are reported as blocked or skipped. Convert them first.
+
+### Legacy `.doc`
+
+Legacy Word `.doc` extraction stays local and uses the first available converter in this order:
+
+1. macOS `textutil`
+2. `antiword`
+3. `catdoc`
+4. LibreOffice `soffice`
+
+On macOS, `textutil` is usually already installed. On other platforms, install LibreOffice or one of the lightweight converters, then run `safeai doctor` to confirm `.doc` readiness. If no converter is available, `safeai prepare` fails closed and does not create an AI bundle.
 
 ## Vault notes
 

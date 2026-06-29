@@ -53,3 +53,58 @@ def test_extract_documents_allows_explicit_hidden_file(tmp_path):
     assert len(docs) == 1
     assert docs[0].status == "ok"
     assert "张三" in docs[0].text
+
+
+def test_extract_legacy_doc_with_local_textutil_converter(tmp_path, monkeypatch):
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    textutil = bin_dir / "textutil"
+    textutil.write_text(
+        "#!/bin/sh\n"
+        "printf '%s\\n' '张三 旧版DOC 电话13812345678'\n",
+        encoding="utf-8",
+    )
+    textutil.chmod(0o755)
+    monkeypatch.setenv("PATH", str(bin_dir))
+    doc = tmp_path / "legacy.doc"
+    doc.write_bytes(b"synthetic legacy doc fixture")
+
+    docs = extract_documents([doc], root=tmp_path)
+
+    assert len(docs) == 1
+    assert docs[0].status == "ok"
+    assert docs[0].media_type == "application/msword"
+    assert "旧版DOC" in docs[0].text
+
+
+def test_extract_legacy_doc_fails_closed_without_converter(tmp_path, monkeypatch):
+    empty_bin = tmp_path / "empty-bin"
+    empty_bin.mkdir()
+    monkeypatch.setenv("PATH", str(empty_bin))
+    doc = tmp_path / "legacy.doc"
+    doc.write_bytes(b"synthetic legacy doc fixture")
+
+    docs = extract_documents([doc], root=tmp_path)
+
+    assert len(docs) == 1
+    assert docs[0].status == "error"
+    assert docs[0].error_code == "doc_dependency_missing"
+    assert "synthetic legacy doc fixture" not in docs[0].error_message
+
+
+def test_extract_legacy_doc_fails_closed_when_converter_fails(tmp_path, monkeypatch):
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    textutil = bin_dir / "textutil"
+    textutil.write_text("#!/bin/sh\nexit 1\n", encoding="utf-8")
+    textutil.chmod(0o755)
+    monkeypatch.setenv("PATH", str(bin_dir))
+    doc = tmp_path / "legacy.doc"
+    doc.write_bytes(b"synthetic legacy doc fixture")
+
+    docs = extract_documents([doc], root=tmp_path)
+
+    assert len(docs) == 1
+    assert docs[0].status == "error"
+    assert docs[0].error_code == "doc_extract_failed"
+    assert "synthetic legacy doc fixture" not in docs[0].error_message

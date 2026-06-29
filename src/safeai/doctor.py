@@ -29,7 +29,7 @@ OPTIONAL_MODULES = {
 
 def run_doctor(root: Path = Path.cwd()) -> Dict[str, object]:
     modules = {name: importlib.util.find_spec(name) is not None for name in OPTIONAL_MODULES}
-    commands = {name: shutil.which(name) is not None for name in ("tesseract", "gitleaks", "pdftotext")}
+    commands = {name: shutil.which(name) is not None for name in ("tesseract", "gitleaks", "pdftotext", "textutil", "antiword", "catdoc", "soffice")}
     policy = load_policy("strict-ai")
     vault_path = root / ".safeai" / "vault" / VAULT_FILE
     return {
@@ -68,4 +68,6 @@ def _notes(modules: Dict[str, bool], commands: Dict[str, bool]) -> List[str]:
         notes.append("Install Presidio for stronger NER; core regex and dictionary detectors are active.")
     if not commands.get("tesseract"):
         notes.append("Install Tesseract before preparing scanned PDFs or images.")
+    if not any(commands.get(name) for name in ("textutil", "antiword", "catdoc", "soffice")):
+        notes.append("Install macOS textutil, LibreOffice, antiword, or catdoc before preparing legacy .doc files.")
     return notes

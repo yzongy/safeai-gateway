@@ -34,13 +34,43 @@ def test_prepare_blocks_ai_bundle_when_secret_is_present(tmp_path, monkeypatch):
 
 def test_prepare_blocks_when_requested_file_cannot_be_extracted(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
-    source = tmp_path / "legacy.doc"
+    source = tmp_path / "legacy.pages"
     source.write_text("binary-ish", encoding="utf-8")
 
     result = prepare([source], policy="strict-ai")
 
     assert result.blocked is True
     assert not result.bundle_path.exists()
+
+
+def test_prepare_legacy_doc_through_local_converter(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    textutil = bin_dir / "textutil"
+    textutil.write_text(
+        "#!/bin/sh\n"
+        "printf '%s\\n' '张三代表涌源合生科技联系 founder@example.com，电话13812345678。'\n",
+        encoding="utf-8",
+    )
+    textutil.chmod(0o755)
+    monkeypatch.setenv("PATH", str(bin_dir))
+    source = tmp_path / "legacy.doc"
+    source.write_bytes(b"synthetic legacy doc fixture")
+
+    prepared = prepare([source], policy="strict-ai")
+
+    assert prepared.blocked is False
+    assert prepared.bundle_path.exists()
+    bundle = prepared.bundle_path.read_text(encoding="utf-8")
+    assert "[SAFEAI_PERSON_0001]" in bundle
+    assert "[SAFEAI_ORG_0001]" in bundle
+    assert "[SAFEAI_EMAIL_MASKED]" in bundle
+    assert "[SAFEAI_PHONE_REDACTED]" in bundle
+    assert "张三" not in bundle
+    assert "涌源合生" not in bundle
+    assert "founder@example.com" not in bundle
+    assert "13812345678" not in bundle
 
 
 def test_prepare_creates_bundle_vault_and_restore_roundtrip(tmp_path, monkeypatch):
