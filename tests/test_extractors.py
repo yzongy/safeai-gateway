@@ -40,3 +40,16 @@ def test_extract_documents_skips_symlink_escape(tmp_path):
 
     assert "inside.md" in source_ids
     assert "escape.md" not in source_ids
+
+
+def test_extract_documents_allows_explicit_hidden_file(tmp_path):
+    hidden_dir = tmp_path / ".safeai" / "demo_inputs"
+    hidden_dir.mkdir(parents=True)
+    hidden_file = hidden_dir / "explicit.md"
+    hidden_file.write_text("张三 电话13812345678", encoding="utf-8")
+
+    docs = extract_documents([hidden_file], root=tmp_path)
+
+    assert len(docs) == 1
+    assert docs[0].status == "ok"
+    assert "张三" in docs[0].text

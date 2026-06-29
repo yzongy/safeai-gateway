@@ -5,7 +5,9 @@ import json
 import sys
 from pathlib import Path
 
+from .codex import install_codex_gateway, status_codex_gateway, uninstall_codex_gateway
 from .doctor import format_doctor, run_doctor
+from .mcp_server import run_mcp_server
 from .pipeline import prepare, restore, scan
 from .vault import Vault
 
@@ -39,6 +41,22 @@ def main(argv=None) -> int:
     purge = vault_sub.add_parser("purge-run")
     purge.add_argument("run_id")
 
+    mcp_parser = sub.add_parser("mcp", help="Start the safeai Codex MCP server over stdio.")
+    mcp_parser.add_argument("--policy", default="strict-ai")
+
+    codex_parser = sub.add_parser("codex", help="Install, inspect, or remove Codex integration.")
+    codex_sub = codex_parser.add_subparsers(dest="codex_command", required=True)
+    codex_install = codex_sub.add_parser("install")
+    codex_install.add_argument("--scope", default="user", choices=["user"])
+    codex_install.add_argument("--policy", default="strict-ai")
+    codex_install.add_argument("--python", default="auto")
+    codex_install.add_argument("--runtime-extra", default="all", choices=["all", "codex"])
+    codex_install.add_argument("--dry-run", action="store_true")
+    codex_status = codex_sub.add_parser("status")
+    codex_status.add_argument("--scope", default="user", choices=["user"])
+    codex_uninstall = codex_sub.add_parser("uninstall")
+    codex_uninstall.add_argument("--scope", default="user", choices=["user"])
+
     args = parser.parse_args(argv)
     if args.command == "doctor":
         print(format_doctor(run_doctor(Path.cwd())))
@@ -57,6 +75,10 @@ def main(argv=None) -> int:
         return 0
     if args.command == "vault":
         return _vault(args)
+    if args.command == "mcp":
+        return run_mcp_server(default_policy=args.policy)
+    if args.command == "codex":
+        return _codex(args)
     return 1
 
 
@@ -85,6 +107,29 @@ def _vault(args) -> int:
         print(f"vault: purged {removed} entries for {args.run_id}")
         return 0
     return 1
+
+
+def _codex(args) -> int:
+    try:
+        if args.codex_command == "install":
+            result = install_codex_gateway(
+                scope=args.scope,
+                policy=args.policy,
+                python=args.python,
+                dry_run=args.dry_run,
+                runtime_extra=args.runtime_extra,
+            )
+        elif args.codex_command == "status":
+            result = status_codex_gateway(scope=args.scope)
+        elif args.codex_command == "uninstall":
+            result = uninstall_codex_gateway(scope=args.scope)
+        else:
+            return 1
+    except Exception as exc:
+        print(f"safeai codex: {exc}", file=sys.stderr)
+        return 2
+    print(json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True))
+    return 0
 
 
 if __name__ == "__main__":

@@ -27,6 +27,9 @@ PII_PATTERNS: Sequence[Tuple[str, str, re.Pattern, float]] = (
     ("BANK_CARD", "bank-card", re.compile(r"(?<!\d)(?:\d[ -]?){15,19}(?!\d)"), 0.72),
     ("USCC", "cn-uscc", re.compile(r"(?<![0-9A-Z])[0-9A-Z]{18}(?![0-9A-Z])"), 0.78),
     ("CONTRACT_ID", "contract-id", re.compile(r"(?<![A-Za-z0-9])(?:HT|XS|NDA|CDA|PO|SO)-?\d{4}[-A-Z0-9]{3,}(?![A-Za-z0-9])", re.I), 0.86),
+    ("CUSTOMER", "customer-id", re.compile(r"(?<![A-Za-z0-9])CUST-\d{4}-\d{3,}(?![A-Za-z0-9])", re.I), 0.86),
+    ("SAMPLE_ID", "sample-id", re.compile(r"(?<![A-Za-z0-9])SAMPLE-\d{8}-[A-Z]\d{2,}(?![A-Za-z0-9])", re.I), 0.9),
+    ("PROJECT", "project-code", re.compile(r"(?<![A-Za-z0-9])(?:[A-Z][A-Za-z0-9]*|[A-Za-z]+)-[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*-\d{2,4}(?![A-Za-z0-9])"), 0.82),
     ("MONEY", "money", re.compile(r"(?:人民币|RMB|¥|\$)\s*\d[\d,]*(?:\.\d+)?\s*(?:元|万元|万|美元|USD)?|\d[\d,]*(?:\.\d+)?\s*(?:元|万元|万|美元|USD)"), 0.86),
     ("DATE", "cn-date", re.compile(r"\b(?:19|20)\d{2}[年/-](?:0?[1-9]|1[0-2])(?:[月/-](?:0?[1-9]|[12]\d|3[01])日?)?\b"), 0.75),
     ("ADDRESS", "cn-address", re.compile(r"[\u4e00-\u9fa5]{2,}(?:省|市|区|县|镇|街道|路|号楼|园区|大厦|基地)"), 0.7),
@@ -35,6 +38,7 @@ PII_PATTERNS: Sequence[Tuple[str, str, re.Pattern, float]] = (
 COMMON_PERSONS = ("张三", "李四", "王五", "赵六", "陈七", "刘强", "王芳", "李娜", "张伟")
 PERSON_CONTEXT = re.compile(r"(?:姓名|联系人|负责人|员工|代表|由|甲方代表|乙方代表)[:：\s]*([\u4e00-\u9fa5]{2,4})")
 ORG_CONTEXT = re.compile(r"(?:在|代表|来自|客户|供应商|公司|主体)[:：\s]*([\u4e00-\u9fa5A-Za-z0-9（）()]{2,32}(?:科技|公司|集团|大学|医院|实验室|中心|研究院|有限公司))")
+ORG_GENERIC = re.compile(r"[\u4e00-\u9fa5A-Za-z0-9（）()]{2,36}(?:科技有限公司|生物科技有限公司|有限公司|研究中心|实验室|研究院|集团|大学|医院)")
 
 
 class RedactionDetector:
@@ -52,6 +56,7 @@ class RedactionDetector:
             findings.extend(self._regex_findings(text, source_id, entity_type, detector, pattern, confidence, "medium"))
         findings.extend(self._dictionary_findings(text, source_id))
         findings.extend(self._heuristic_name_findings(text, source_id))
+        findings.extend(self._generic_org_findings(text, source_id))
         return adjudicate_findings(findings)
 
     def _regex_findings(
@@ -120,6 +125,19 @@ class RedactionDetector:
             for match in pattern.finditer(text):
                 start, end = match.span(group_index)
                 findings.append(self._span_finding(entity_type, detector_name, source_id, start, end, 0.84, match.group(group_index)))
+        return findings
+
+    def _generic_org_findings(self, text: str, source_id: str) -> List[Finding]:
+        findings: List[Finding] = []
+        for match in ORG_GENERIC.finditer(text):
+            value = match.group(0)
+            start = match.start()
+            for marker in ("客户为", "给", "向", "合作单位：", "合作单位:", "代表"):
+                if marker in value:
+                    _, value = value.rsplit(marker, 1)
+                    start = match.end() - len(value)
+                    break
+            findings.append(self._span_finding("ORG", "cn-org-generic", source_id, start, start + len(value), 0.8, value))
         return findings
 
     def _span_finding(self, entity_type: str, detector: str, source_id: str, start: int, end: int, confidence: float, value: str) -> Finding:

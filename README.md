@@ -19,6 +19,14 @@ For the full local document/OCR/security stack:
 python3 -m pip install "safeai-gateway[all] @ git+https://github.com/yzongy/safeai-gateway.git"
 ```
 
+For Codex integration, use Python 3.10+ for the MCP server:
+
+```bash
+python3.12 -m pip install "safeai-gateway[codex] @ git+https://github.com/yzongy/safeai-gateway.git"
+safeai codex install --scope user
+safeai codex status
+```
+
 Or clone the repo and let the installer create a virtual environment:
 
 ```bash
@@ -55,6 +63,10 @@ safeai restore <sanitized-file> --run <run_id>
 safeai vault status
 safeai vault rotate-key
 safeai vault purge-run <run_id>
+safeai mcp --policy strict-ai
+safeai codex install --scope user --policy strict-ai --python auto --runtime-extra all
+safeai codex status --scope user
+safeai codex uninstall --scope user
 ```
 
 Without installation, prefix commands with:
@@ -78,11 +90,41 @@ PYTHONPATH=tools/ai_collab_gateway/src python3 -m safeai
 The built-in `strict-ai` policy fails closed on secrets:
 
 - `API_KEY`, `PRIVATE_KEY`, `PASSWORD`, `JWT`, `COOKIE`: block bundle generation.
-- `PERSON`, `ORG`, `PROJECT`, `CUSTOMER`, `SUPPLIER`, `CONTRACT_ID`: reversible tokens such as `[SAFEAI_PERSON_0001]`.
+- `PERSON`, `ORG`, `PROJECT`, `CUSTOMER`, `SUPPLIER`, `CONTRACT_ID`, `SAMPLE_ID`: reversible tokens such as `[SAFEAI_PERSON_0001]`.
 - `PHONE`, `EMAIL`, `ID_CARD`, `BANK_CARD`: redacted or masked.
 - `ADDRESS`, `DATE`, `MONEY`: generalized, month-only, or bucketed.
 
 The core detector uses local rules, Chinese PII patterns, secret signatures, and optional dictionaries. If Presidio is installed later, it can be added as a stronger local NER layer without changing the gateway contract.
+
+## Use with Codex
+
+`safeai` can register itself as a local Codex MCP server and install a global skill named `safeai-codex-gateway`. After installation, Codex has tools for `safeai_doctor`, `safeai_scan`, `safeai_prepare`, and `safeai_restore`.
+
+Run:
+
+```bash
+safeai codex install --scope user --policy strict-ai --python auto
+```
+
+The installer writes:
+
+- `~/.codex/skills/safeai-codex-gateway/SKILL.md`
+- `~/.codex/skills/safeai-codex-gateway/agents/openai.yaml`
+- a managed `[mcp_servers.safeai]` block in `~/.codex/config.toml`
+- a short global rule in `~/.codex/AGENTS.md`
+
+It creates backups before editing existing Codex files. It does not print or rewrite existing provider tokens or MCP credentials.
+
+If the selected Python does not already have `safeai` and the MCP SDK installed, the installer creates `~/.codex/safeai-gateway/venv` and installs the `all` extra there. Use `--runtime-extra codex` for a smaller MCP-only runtime. The MCP server in `config.toml` points to the managed runtime.
+
+The installed skill tells Codex to handle sensitive local files this way:
+
+1. Do not read the raw file body first.
+2. Call `safeai_prepare` on the local path.
+3. If `blocked=false`, read only the returned `bundle_path`.
+4. If `blocked=true`, stop and report the local `report_path` plus blocked categories.
+
+This is a Codex tool and instruction integration, not an operating-system file-access hook. If sensitive text is pasted directly into chat, Codex cannot pre-sanitize it; save the material as a local file and run it through `safeai_prepare`.
 
 ## Supported files
 

@@ -43,7 +43,7 @@ def enumerate_input_files(paths: Iterable[Path], root: Path) -> List[Path]:
                     continue
                 if child.is_file():
                     files.append(child.resolve())
-        elif path.is_file() and not _skip_path(path):
+        elif path.is_file() and ".git" not in set(path.parts):
             files.append(path)
     return sorted(dict.fromkeys(files))
 

@@ -23,6 +23,7 @@ DEFAULT_POLICY = {
         "PROJECT": "tokenize",
         "CUSTOMER": "tokenize",
         "SUPPLIER": "tokenize",
+        "SAMPLE_ID": "tokenize",
         "PHONE": "redact",
         "EMAIL": "mask",
         "ID_CARD": "redact",
