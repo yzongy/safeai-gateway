@@ -1,0 +1,48 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "safeai-gateway"
+version = "0.1.0"
+description = "Local offline redaction gateway for AI collaboration"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "safeai gateway contributors" }]
+dependencies = [
+  "PyYAML>=5.4",
+]
+
+[project.optional-dependencies]
+office = ["openpyxl>=3.0", "python-docx>=1.0", "python-pptx>=0.6"]
+pdf = ["PyMuPDF>=1.23"]
+ocr = ["Pillow>=8.0", "pytesseract>=0.3"]
+security = ["cryptography>=41", "keyring>=24", "presidio-analyzer>=2.2", "presidio-anonymizer>=2.2", "detect-secrets>=1.5"]
+dev = ["pytest>=6.0"]
+all = [
+  "openpyxl>=3.0",
+  "python-docx>=1.0",
+  "python-pptx>=0.6",
+  "PyMuPDF>=1.23",
+  "Pillow>=8.0",
+  "pytesseract>=0.3",
+  "cryptography>=41",
+  "keyring>=24",
+  "presidio-analyzer>=2.2",
+  "presidio-anonymizer>=2.2",
+  "detect-secrets>=1.5",
+]
+
+[project.scripts]
+safeai = "safeai.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/yzongy/safeai-gateway"
+Issues = "https://github.com/yzongy/safeai-gateway/issues"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.setuptools.packages.find]
+where = ["src"]

@@ -1,0 +1,37 @@
+mode: ai_collaboration
+default_action: replace
+fail_on:
+  - SECRET
+  - API_KEY
+  - PASSWORD
+  - PRIVATE_KEY
+  - JWT
+  - COOKIE
+entities:
+  SECRET: fail
+  API_KEY: fail
+  PASSWORD: fail
+  PRIVATE_KEY: fail
+  JWT: fail
+  COOKIE: fail
+  PERSON: tokenize
+  ORG: tokenize
+  PROJECT: tokenize
+  CUSTOMER: tokenize
+  SUPPLIER: tokenize
+  PHONE: redact
+  EMAIL: mask
+  ID_CARD: redact
+  BANK_CARD: redact
+  ADDRESS: generalize
+  DATE: month_only
+  MONEY: bucket
+  CONTRACT_ID: tokenize
+  USCC: tokenize
+custom_terms:
+  - source: examples/dictionaries/employees.csv
+    entity: PERSON
+  - source: examples/dictionaries/customers.csv
+    entity: ORG
+  - source: examples/dictionaries/projects.csv
+    entity: PROJECT
